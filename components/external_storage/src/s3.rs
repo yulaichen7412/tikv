@@ -12,8 +12,6 @@ use rusoto_core::{
 };
 use rusoto_s3::*;
 
-use rusoto_util::new_client;
-
 use super::{
     util::{block_on_external_io, error_stream, AsyncReadAsSyncStreamOfBytes},
     ExternalStorage,

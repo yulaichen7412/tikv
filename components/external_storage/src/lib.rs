@@ -9,6 +9,8 @@
 extern crate slog_global;
 #[allow(unused_extern_crates)]
 extern crate tikv_alloc;
+#[macro_use(new_client)]
+extern crate rusoto_util;
 
 use std::io;
 use std::marker::Unpin;

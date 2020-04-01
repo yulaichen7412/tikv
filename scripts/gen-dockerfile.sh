@@ -8,7 +8,7 @@
 # it is our lowest common denominator in terms of distro support.
 
 # Some commands in this script are structured in order to reduce the number of layers Docker
-# generates. Unfortunately Docker is limited to only 125 layers: 
+# generates. Unfortunately Docker is limited to only 125 layers:
 # https://github.com/moby/moby/blob/a9507c6f76627fdc092edc542d5a7ef4a6df5eec/layer/layer.go#L50-L53
 
 # We require epel packages, so enable the fedora EPEL repo then install dependencies.
@@ -76,6 +76,8 @@ for i in ${components[@]}; do
     echo "COPY ${i}/Cargo.toml ${i}/Cargo.toml"
 done
 
+echo "COPY .git .git"
+
 # Create dummy files, build the dependencies
 # then remove TiKV fingerprint for following rebuild.
 # Finally, remove test dependencies and profile features.
@@ -86,10 +88,11 @@ RUN mkdir -p ./cmd/src/bin && \\
     for cargotoml in \$(find . -name "Cargo.toml"); do \\
         sed -i '/fuzz/d' \${cargotoml} && \\
         sed -i '/test\_/d' \${cargotoml} && \\
+        sed -i '/\/test/d' \${cargotoml} && \\
         sed -i '/profiler/d' \${cargotoml} && \\
         sed -i '/\"tests\",/d' \${cargotoml} ; \\
     done && \\
-    make build_dist_release
+    make dist_release
 EOT
 
 # Remove fingerprints for when we build the real binaries.
