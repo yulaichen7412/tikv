@@ -23,7 +23,7 @@ use tikv_util::time::Instant;
 use tikv_util::timer::SteadyTimer;
 use tikv_util::worker::{Runnable, ScheduleError, Scheduler};
 use tokio_threadpool::{Builder, Sender as PoolSender, ThreadPool};
-use txn_types::{Key, Lock, TimeStamp};
+use txn_types::{Key, Lock, LockType, TimeStamp};
 
 use crate::delegate::{Delegate, Downstream, DownstreamID};
 use crate::metrics::*;
@@ -618,7 +618,10 @@ impl Initializer {
                     let (encoded_key, value) = lock;
                     let key = Key::from_encoded_slice(encoded_key).into_raw().unwrap();
                     let lock = Lock::parse(value)?;
-                    resolver.track_lock(lock.ts, key);
+                    // Don't track type Lock and Pessimistic, they are filtered in commit.
+                    if lock.lock_type == LockType::Put || lock.lock_type == LockType::Delete {
+                        resolver.track_lock(lock.ts, key);
+                    }
                 }
             }
         }
