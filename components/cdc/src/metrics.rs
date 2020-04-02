@@ -16,8 +16,13 @@ lazy_static! {
         exponential_buckets(0.0001, 2.0, 20).unwrap()
     )
     .unwrap();
-    pub static ref CDC_MIN_TS_REGION: IntGauge = register_int_gauge!(
-        "tikv_cdc_min_ts_region",
+    pub static ref CDC_MIN_RESOLVED_TS: IntGauge = register_int_gauge!(
+        "tikv_cdc_min_resolved_ts",
+        "The minimal resolved ts of all regions"
+    )
+    .unwrap();
+    pub static ref CDC_MIN_RESOLVED_TS_REGION: IntGauge = register_int_gauge!(
+        "tikv_cdc_min_resolved_ts_region_id",
         "The region which has minimal resolved ts"
     )
     .unwrap();
