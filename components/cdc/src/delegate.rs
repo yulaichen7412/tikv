@@ -301,7 +301,7 @@ impl Delegate {
             Some(rts) => rts,
             None => return None,
         };
-        debug!("resolved ts updated";
+        info!("resolved ts updated";
             "region_id" => self.region_id, "resolved_ts" => resolved_ts);
         let mut change_data_event = Event::default();
         change_data_event.region_id = self.region_id;
