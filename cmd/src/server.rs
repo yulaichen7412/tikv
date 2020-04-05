@@ -63,6 +63,7 @@ use tikv_util::{
     security::SecurityManager,
     sys::sys_quota::SysQuota,
     time::Monitor,
+    timer::Timer,
     worker::{FutureScheduler, FutureWorker, Worker},
 };
 
@@ -596,8 +597,11 @@ impl TiKVServer {
             raft_router,
             cdc_ob,
         );
+        // Currently there is only one timeout for cdc.
+        let cdc_timer_cap = 1;
+        let timer = Timer::new(cdc_timer_cap);
         cdc_worker
-            .start(cdc_endpoint)
+            .start_with_timer(cdc_endpoint, timer)
             .unwrap_or_else(|e| fatal!("failed to start cdc: {}", e));
         self.to_stop.push(cdc_worker);
 
