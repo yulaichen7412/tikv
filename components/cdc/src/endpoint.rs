@@ -184,6 +184,8 @@ impl fmt::Debug for Task {
     }
 }
 
+const METRICS_FLUSH_INTERVAL: u64 = 10_000; // 10s
+
 pub struct Endpoint<T> {
     capture_regions: HashMap<u64, Delegate>,
     connections: HashMap<ConnID, Conn>,
@@ -229,6 +231,14 @@ impl<T: 'static + RaftStoreRouter> Endpoint<T> {
         };
         ep.register_min_ts_event();
         ep
+    }
+
+    pub fn new_timer(&self) -> Timer<()> {
+        // Currently there is only one timeout for CDC.
+        let cdc_timer_cap = 1;
+        let mut timer = Timer::new(cdc_timer_cap);
+        timer.add_task(Duration::from_millis(METRICS_FLUSH_INTERVAL), ());
+        timer
     }
 
     pub fn set_min_ts_interval(&mut self, dur: Duration) {
@@ -805,7 +815,6 @@ impl<T: 'static + RaftStoreRouter> RunnableWithTimer<Task, ()> for Endpoint<T> {
         self.min_resolved_ts = TimeStamp::max();
         self.min_ts_region_id = 0;
 
-        const METRICS_FLUSH_INTERVAL: u64 = 10_000; // 10s
         timer.add_task(Duration::from_millis(METRICS_FLUSH_INTERVAL), ());
     }
 }
