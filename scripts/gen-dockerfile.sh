@@ -8,7 +8,7 @@
 # it is our lowest common denominator in terms of distro support.
 
 # Some commands in this script are structured in order to reduce the number of layers Docker
-# generates. Unfortunately Docker is limited to only 125 layers: 
+# generates. Unfortunately Docker is limited to only 125 layers:
 # https://github.com/moby/moby/blob/a9507c6f76627fdc092edc542d5a7ef4a6df5eec/layer/layer.go#L50-L53
 
 # We require epel packages, so enable the fedora EPEL repo then install dependencies.
@@ -54,55 +54,9 @@ RUN rustup set profile minimal
 RUN rustup default \$(cat "rust-toolchain")
 EOT
 
-# Use Makefile to build
-cat <<EOT
-COPY Makefile ./
-EOT
-
-# For cargo
-cat <<EOT
-COPY scripts ./scripts
-COPY etc ./etc
-COPY Cargo.lock ./Cargo.lock
-EOT
-
-# Get components, remove test and profiler components
-components=($(find . -type f -name 'Cargo.toml' | sed -r 's|/[^/]+$||' | sort -u))
-src_dirs=$(for i in ${components[@]}; do echo ${i}/src; done | xargs)
-lib_files=$(for i in ${components[@]}; do echo ${i}/src/lib.rs; done | xargs)
-# List components and add their Cargo files
-echo "RUN mkdir -p ${src_dirs} && touch ${lib_files}"
-for i in ${components[@]}; do
-    echo "COPY ${i}/Cargo.toml ${i}/Cargo.toml"
-done
-
-# Create dummy files, build the dependencies
-# then remove TiKV fingerprint for following rebuild.
-# Finally, remove test dependencies and profile features.
-cat <<EOT
-RUN mkdir -p ./cmd/src/bin && \\
-    echo 'fn main() {}' > ./cmd/src/bin/tikv-ctl.rs && \\
-    echo 'fn main() {}' > ./cmd/src/bin/tikv-server.rs && \\
-    for cargotoml in \$(find . -name "Cargo.toml"); do \\
-        sed -i '/fuzz/d' \${cargotoml} && \\
-        sed -i '/test\_/d' \${cargotoml} && \\
-        sed -i '/profiler/d' \${cargotoml} && \\
-        sed -i '/\"tests\",/d' \${cargotoml} ; \\
-    done && \\
-    make build_dist_release
-EOT
-
-# Remove fingerprints for when we build the real binaries.
-fingerprint_dirs=$(for i in ${components[@]}; do echo ./target/release/.fingerprint/$(basename ${i})-*; done | xargs)
-echo "RUN rm -rf ${fingerprint_dirs} ./target/release/.fingerprint/tikv-*"
-for i in "${components[@]:1}"; do
-    echo "COPY ${i} ${i}"
-done
-echo "COPY src src"
-
 # Build real binaries now
 cat <<EOT
-COPY ./.git ./.git
+COPY . .
 RUN make build_dist_release
 EOT
 

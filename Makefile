@@ -157,9 +157,6 @@ dist_release:
 	make build_dist_release
 	@mkdir -p ${BIN_PATH}
 	@cp -f ${CARGO_TARGET_DIR}/release/tikv-ctl ${CARGO_TARGET_DIR}/release/tikv-server ${BIN_PATH}/
-ifeq ($(shell uname),Linux) # Macs binary isn't elf format
-	@python scripts/check-bins.py --features "${ENABLE_FEATURES}" --check-release ${BIN_PATH}/tikv-ctl ${BIN_PATH}/tikv-server
-endif
 
 # Build with release flag as if it were for distribution, but without
 # additional sanity checks and file movement.
@@ -172,8 +169,8 @@ ifeq ($(shell uname),Linux) # Macs don't have objcopy
 	# dwz ${CARGO_TARGET_DIR}/release/tikv-server
 	# FIXME: https://sourceware.org/bugzilla/show_bug.cgi?id=24764
 	# dwz ${CARGO_TARGET_DIR}/release/tikv-ctl
-	objcopy --compress-debug-sections=zlib-gnu ${CARGO_TARGET_DIR}/release/tikv-server
-	objcopy --compress-debug-sections=zlib-gnu ${CARGO_TARGET_DIR}/release/tikv-ctl
+	# objcopy --compress-debug-sections=zlib-gnu ${CARGO_TARGET_DIR}/release/tikv-server
+	# objcopy --compress-debug-sections=zlib-gnu ${CARGO_TARGET_DIR}/release/tikv-ctl
 endif
 
 # Distributable bins with SSE4.2 optimizations
