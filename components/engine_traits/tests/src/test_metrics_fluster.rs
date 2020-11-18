@@ -4,14 +4,12 @@ use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
 
-use rocksdb::DBOptions;
+use engine_rocks::raw::{DBOptions, TitanDBOptions};
 use tempfile::Builder;
 
 use engine_rocks::util::{self as rocks_util, RocksCFOptions};
 use engine_rocks::{RocksColumnFamilyOptions, RocksDBOptions};
-use engine_traits::{
-    ColumnFamilyOptions, KvEngines, MetricsFlusher, CF_DEFAULT, CF_LOCK, CF_WRITE,
-};
+use engine_traits::{ColumnFamilyOptions, Engines, MetricsFlusher, CF_DEFAULT, CF_LOCK, CF_WRITE};
 
 #[test]
 fn test_metrics_flusher() {
@@ -20,7 +18,9 @@ fn test_metrics_flusher() {
         .tempdir()
         .unwrap();
     let raft_path = path.path().join(Path::new("raft"));
-    let db_opt = RocksDBOptions::from_raw(DBOptions::new());
+    let mut db_opt = DBOptions::new();
+    db_opt.set_titandb_options(&TitanDBOptions::new());
+    let db_opt = RocksDBOptions::from_raw(db_opt);
     let cf_opts = RocksColumnFamilyOptions::new();
     let cfs_opts = vec![
         RocksCFOptions::new(CF_DEFAULT, ColumnFamilyOptions::new()),
@@ -40,8 +40,8 @@ fn test_metrics_flusher() {
         cfs_opts,
     )
     .unwrap();
-    let shared_block_cache = false;
-    let engines = KvEngines::new(engine, raft_engine, shared_block_cache);
+
+    let engines = Engines::new(engine, raft_engine);
     let mut metrics_flusher = MetricsFlusher::new(engines);
     metrics_flusher.set_flush_interval(Duration::from_millis(100));
 

@@ -220,11 +220,7 @@ fn test_read_hibernated_region() {
     let resp1_ch = async_read_on_peer(&mut cluster, p2.clone(), region.clone(), b"k1", true, true);
     let resp1 = resp1_ch.recv_timeout(Duration::from_secs(5)).unwrap();
     assert!(
-        resp1
-            .get_header()
-            .get_error()
-            .get_message()
-            .contains("can not read index due to no leader"),
+        resp1.get_header().get_error().has_not_leader(),
         "{:?}",
         resp1.get_header()
     );
@@ -269,14 +265,47 @@ fn test_replica_read_on_stale_peer() {
     );
     cluster.sim.wl().add_recv_filter(3, filter);
     cluster.must_put(b"k2", b"v2");
-    let resp1_ch = async_read_on_peer(
-        &mut cluster,
-        peer_on_store3.clone(),
-        region.clone(),
-        b"k2",
-        true,
-        true,
-    );
+    let resp1_ch = async_read_on_peer(&mut cluster, peer_on_store3, region, b"k2", true, true);
     // must be timeout
     assert!(resp1_ch.recv_timeout(Duration::from_micros(100)).is_err());
+}
+
+#[test]
+fn test_read_index_out_of_order() {
+    let mut cluster = new_node_cluster(0, 2);
+
+    // Use long election timeout and short lease.
+    configure_for_lease_read(&mut cluster, Some(1000), Some(10));
+    cluster.cfg.raft_store.raft_store_max_leader_lease =
+        ReadableDuration(Duration::from_millis(100));
+
+    let pd_client = Arc::clone(&cluster.pd_client);
+    pd_client.disable_default_operator();
+
+    let rid = cluster.run_conf_change();
+    pd_client.must_add_peer(rid, new_peer(2, 2));
+
+    cluster.must_put(b"k1", b"v1");
+    must_get_equal(&cluster.get_engine(2), b"k1", b"v1");
+
+    cluster.must_transfer_leader(1, new_peer(1, 1));
+
+    let filter = Box::new(
+        RegionPacketFilter::new(1, 1)
+            .direction(Direction::Recv)
+            .msg_type(MessageType::MsgHeartbeatResponse),
+    );
+    cluster.sim.wl().add_recv_filter(1, filter);
+
+    // Can't get read resonse because heartbeat responses are blocked.
+    let r1 = cluster.get_region(b"k1");
+    let resp1 = async_read_on_peer(&mut cluster, new_peer(1, 1), r1.clone(), b"k1", true, true);
+    assert!(resp1.recv_timeout(Duration::from_secs(2)).is_err());
+
+    pd_client.must_remove_peer(rid, new_peer(2, 2));
+
+    // After peer 2 is removed, we can get 2 read responses.
+    let resp2 = async_read_on_peer(&mut cluster, new_peer(1, 1), r1, b"k1", true, true);
+    assert!(resp2.recv_timeout(Duration::from_secs(1)).is_ok());
+    assert!(resp1.recv_timeout(Duration::from_secs(1)).is_ok());
 }

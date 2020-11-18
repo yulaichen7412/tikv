@@ -222,7 +222,8 @@ use std::fmt::{Display, Formatter};
 
 impl Display for Json {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        let s = serde_json::to_string(&self.as_ref()).unwrap();
+        write!(f, "{}", s)
     }
 }
 
@@ -230,9 +231,14 @@ impl Json {
     /// Creates a new JSON from the type and encoded bytes
     pub fn new(tp: JsonType, value: Vec<u8>) -> Self {
         Self {
-            type_code: tp.into(),
+            type_code: tp,
             value,
         }
+    }
+
+    /// Returns the JSON type
+    pub fn get_type(&self) -> JsonType {
+        self.type_code
     }
 
     /// Creates a `string` JSON from a `String`
@@ -296,7 +302,7 @@ impl Json {
     }
 
     /// Creates a `object` JSON from key-value pairs
-    pub fn from_kv_pairs<'a>(entries: Vec<(&[u8], JsonRef<'a>)>) -> Result<Self> {
+    pub fn from_kv_pairs(entries: Vec<(&[u8], JsonRef)>) -> Result<Self> {
         let mut value = vec![];
         value.write_json_obj_from_keys_values(entries)?;
         Ok(Self::new(JsonType::Object, value))
@@ -370,17 +376,23 @@ impl ConvertTo<f64> for Json {
     ///  Keep compatible with TiDB's `ConvertJSONToFloat` function.
     #[inline]
     fn convert(&self, ctx: &mut EvalContext) -> Result<f64> {
-        let d = match self.as_ref().get_type() {
+        self.as_ref().convert(ctx)
+    }
+}
+
+impl<'a> ConvertTo<f64> for JsonRef<'a> {
+    ///  Keep compatible with TiDB's `ConvertJSONToFloat` function.
+    #[inline]
+    fn convert(&self, ctx: &mut EvalContext) -> Result<f64> {
+        let d = match self.get_type() {
             JsonType::Array | JsonType::Object => 0f64,
-            JsonType::U64 => self.as_ref().get_u64() as f64,
-            JsonType::I64 => self.as_ref().get_i64() as f64,
-            JsonType::Double => self.as_ref().get_double(),
-            JsonType::Literal => {
-                self.as_ref()
-                    .get_literal()
-                    .map_or(0f64, |x| if x { 1f64 } else { 0f64 })
-            }
-            JsonType::String => self.as_ref().get_str_bytes()?.convert(ctx)?,
+            JsonType::U64 => self.get_u64() as f64,
+            JsonType::I64 => self.get_i64() as f64,
+            JsonType::Double => self.get_double(),
+            JsonType::Literal => self
+                .get_literal()
+                .map_or(0f64, |x| if x { 1f64 } else { 0f64 }),
+            JsonType::String => self.get_str_bytes()?.convert(ctx)?,
         };
         Ok(d)
     }

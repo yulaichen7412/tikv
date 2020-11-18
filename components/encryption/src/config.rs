@@ -19,6 +19,8 @@ pub struct EncryptionConfig {
     #[config(skip)]
     pub data_key_rotation_period: ReadableDuration,
     #[config(skip)]
+    pub file_rewrite_threshold: u64,
+    #[config(skip)]
     pub master_key: MasterKeyConfig,
     #[config(skip)]
     pub previous_master_key: MasterKeyConfig,
@@ -31,6 +33,7 @@ impl Default for EncryptionConfig {
             data_key_rotation_period: ReadableDuration::days(7),
             master_key: MasterKeyConfig::default(),
             previous_master_key: MasterKeyConfig::default(),
+            file_rewrite_threshold: 1000000,
         }
     }
 }
@@ -38,17 +41,27 @@ impl Default for EncryptionConfig {
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 #[serde(rename_all = "kebab-case")]
-pub struct FileCofnig {
+pub struct FileConfig {
     pub path: String,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, Eq, Configuration)]
 #[serde(default)]
 #[serde(rename_all = "kebab-case")]
 pub struct KmsConfig {
     pub key_id: String,
 
+    // Providing access_key and secret_access_key is recommended as it has
+    // security risk.
+    #[doc(hidden)]
+    // We don's want to write access_key and secret_access_key to config file
+    // accidentally.
+    #[serde(skip_serializing)]
+    #[config(skip)]
     pub access_key: String,
+    #[doc(hidden)]
+    #[serde(skip_serializing)]
+    #[config(skip)]
     pub secret_access_key: String,
 
     pub region: String,
@@ -79,7 +92,7 @@ pub enum MasterKeyConfig {
     #[serde(rename_all = "kebab-case")]
     File {
         #[serde(flatten)]
-        config: FileCofnig,
+        config: FileConfig,
     },
 
     #[serde(rename_all = "kebab-case")]
@@ -177,6 +190,7 @@ mod tests {
                 },
             },
             previous_master_key: MasterKeyConfig::Plaintext,
+            file_rewrite_threshold: 1000000,
         };
         let kms_str = r#"
         data-encryption-method = "aes128-ctr"
